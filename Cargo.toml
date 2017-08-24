@@ -1,0 +1,10 @@
+[package]
+name = "mdf2016"
+version = "0.1.0"
+authors = ["Guillaume Pinot <texitoi@texitoi.eu>"]
+
+[dependencies]
+petgraph = "0.4.5"
+structopt = "0.1"
+structopt-derive = "0.1"
+rand = "0.3"
