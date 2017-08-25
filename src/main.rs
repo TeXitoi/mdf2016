@@ -8,6 +8,9 @@ use structopt::StructOpt;
 use std::io::BufRead;
 use rand::Rng;
 
+type Graph = petgraph::graph::Graph<u32, (), petgraph::Undirected>;
+type NodeId = petgraph::graph::NodeIndex;
+
 #[derive(StructOpt)]
 enum Opt {
     #[structopt(name = "gen")]
@@ -28,7 +31,7 @@ fn gen(nb: u32) {
     }
 }
 
-fn solve() {
+fn read_graph() -> Graph {
     let stdin = std::io::stdin();
     let mut ints = std::io::BufReader::new(stdin.lock()).lines().flat_map(|l| {
         l.unwrap()
@@ -38,10 +41,15 @@ fn solve() {
             .into_iter()
     });
     let n = ints.next().unwrap() as usize;
-    let mut g = petgraph::graph::Graph::<u32, (), petgraph::Undirected>::with_capacity(n, n - 1);
+    let mut g = Graph::with_capacity(n, n - 1);
     while let (Some(u), Some(v)) = (ints.next(), ints.next()) {
         g.extend_with_edges(&[(u, v)]);
     }
+    g
+}
+
+fn solve() {
+    let mut g = read_graph();
 
     let mut dfs = petgraph::visit::DfsPostOrder::new(&g, 0.into());
     while let Some(u) = dfs.next(&g) {
@@ -51,34 +59,28 @@ fn solve() {
     //use petgraph::dot::{Dot, Config};
     //println!("{:?}", Dot::with_config(&g, &[Config::EdgeNoLabel]));
 
-    let n = g.node_count() as u32;
-    let n2 = n / 2;
+    fn max_deconnected(u: NodeId, g: &Graph) -> (u32, NodeId) {
+        let n = g.node_count() as u32;
+        g.neighbors(u)
+            .map(|v| if g[v] > g[u] { (n - g[u], v) } else { (g[v], v) })
+            .max()
+            .unwrap()
+    }
+
+    let n2 = g.node_count() as u32 / 2;
     let mut u = 0.into();
     loop {
-        let (nb, v) = g.neighbors(u).filter_map(|v| {
-            if g[v] > g[u] {
-                None
-            } else {
-                Some((g[v], v))
-            }
-        }).max().unwrap();
+        let (nb, v) = max_deconnected(u, &g);
         if nb <= n2 { break; }
         u = v;
     }
-    let (deconnected, v) = g.neighbors(u).map(|v| {
-        if g[v] > g[u] {
-            (n - g[u], v)
-        } else {
-            (g[v], v)
-        }
-    }).max().unwrap();
-    println!("centroid: {}, nb_deconected = {}, critical_edge: {}-{}",
+    let (deconnected, v) = max_deconnected(u, &g);
+    println!("nb_deconected = {}, centroid: {}, critical_edge: {}-{}",
              u.index(), deconnected, u.index(), v.index());
 }
 
 fn main() {
-    let opt = Opt::from_args();
-    match opt {
+    match Opt::from_args() {
         Opt::Gen { nb } => gen(nb),
         Opt::Solve => solve(),
     }
