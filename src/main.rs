@@ -1,32 +1,25 @@
-extern crate petgraph;
-#[macro_use]
-extern crate structopt_derive;
-extern crate structopt;
-extern crate rand;
-
-use structopt::StructOpt;
-use std::io::BufRead;
+use clap::Parser;
 use rand::Rng;
+use rand::SeedableRng;
+use std::io::BufRead;
 
 type Graph = petgraph::graph::Graph<u32, (), petgraph::Undirected>;
 type NodeId = petgraph::graph::NodeIndex;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 enum Opt {
-    #[structopt(name = "gen")]
     Gen {
         /// Number of vertices.
-        nb: u32
+        nb: u32,
     },
-    #[structopt(name = "solve")]
     Solve,
 }
 
-fn gen(nb: u32) {
+fn generate(nb: u32) {
     println!("{}", nb);
-    let mut rnd = rand::XorShiftRng::new_unseeded();
+    let mut rnd = rand::rngs::StdRng::seed_from_u64(42);
     for u in 1..nb {
-        let v = rnd.gen_range::<u32>(0, u);
+        let v = rnd.random_range(0..u);
         println!("{} {}", u, v);
     }
 }
@@ -62,7 +55,13 @@ fn solve() {
     fn max_deconnected(u: NodeId, g: &Graph) -> (u32, NodeId) {
         let n = g.node_count() as u32;
         g.neighbors(u)
-            .map(|v| if g[v] > g[u] { (n - g[u], v) } else { (g[v], v) })
+            .map(|v| {
+                if g[v] > g[u] {
+                    (n - g[u], v)
+                } else {
+                    (g[v], v)
+                }
+            })
             .max()
             .unwrap()
     }
@@ -71,17 +70,24 @@ fn solve() {
     let mut u = 0.into();
     loop {
         let (nb, v) = max_deconnected(u, &g);
-        if nb <= n2 { break; }
+        if nb <= n2 {
+            break;
+        }
         u = v;
     }
     let (deconnected, v) = max_deconnected(u, &g);
-    println!("nb_deconected = {}, centroid: {}, critical_edge: {}-{}",
-             u.index(), deconnected, u.index(), v.index());
+    println!(
+        "nb_deconected = {}, centroid: {}, critical_edge: {}-{}",
+        deconnected,
+        u.index(),
+        u.index(),
+        v.index()
+    );
 }
 
 fn main() {
-    match Opt::from_args() {
-        Opt::Gen { nb } => gen(nb),
+    match Opt::parse() {
+        Opt::Gen { nb } => generate(nb),
         Opt::Solve => solve(),
     }
 }
